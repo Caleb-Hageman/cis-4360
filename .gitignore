@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Node
+node_modules/
+dist/
+.eslintcache
+
+# Secrets & Environment
+.env
+*.json (unless it's a config file—careful with Google Service Account keys!)
+credentials/
+
+# OS specific
+.DS_Store
+Thumbs.db

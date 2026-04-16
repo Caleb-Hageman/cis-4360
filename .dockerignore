@@ -1,0 +1,17 @@
+# Folders to ignore
+node_modules/
+__pycache__/
+.venv/
+env/
+dist/
+build/
+
+# Files to ignore
+.env
+.git
+.gitignore
+*.log
+docker-compose.yml
+Dockerfile
+
+credentials/
