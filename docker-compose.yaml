@@ -10,6 +10,7 @@ services:
       - ./backend:/app
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-key.json
+      - PYTHONPATH=/app
     working_dir: /app
 
   frontend:
