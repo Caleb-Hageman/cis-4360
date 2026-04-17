@@ -10,13 +10,11 @@ function App() {
   const [pendingData, setPendingData] = useState<SheetRow | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Use the Environment Variable instead of a hardcoded string
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   const handleSendMessage = async (text: string) => {
     const newUserMsg: Message = { role: 'user', content: text };
     setMessages(prev => [...prev, newUserMsg]);
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
@@ -26,15 +24,12 @@ function App() {
           user_profile: { name: "Caleb", preferences: {} }
         }),
       });
-
       const data = await response.json();
-
-      const newAssistantMsg: Message = { 
-        role: 'assistant', 
+      const newAssistantMsg: Message = {
+        role: 'assistant',
         content: data.reply,
-        preview: data.preview as SheetRow 
+        preview: data.preview as SheetRow
       };
-      
       setMessages(prev => [...prev, newAssistantMsg]);
       setPendingData(data.preview);
     } catch (error) {
@@ -45,14 +40,12 @@ function App() {
   const handleCommit = async () => {
     if (!pendingData) return;
     setIsLoading(true);
-
     try {
       await fetch(`${API_BASE_URL}/api/commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: pendingData }),
       });
-      
       alert("Added to LeetCode Tracker!");
       setPendingData(null);
     } catch (error) {
@@ -65,25 +58,26 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>LeetCode Tracker Agent</h1>
+        <h1>LeetCode Tracker</h1>
+        <div className="user-avatar">C</div>
       </header>
-      
       <main className="main-content">
-        <ChatInterface 
-          messages={messages} 
-          onSendMessage={handleSendMessage} 
+        <ChatInterface
+          messages={messages}
+          onSendMessage={handleSendMessage}
         />
-        
-        <div className="preview-sidebar">
-          <DataPreview 
-            data={pendingData} 
-            onCommit={handleCommit} 
-            isLoading={isLoading} 
-          />
-        </div>
+        {pendingData && (
+          <div className="preview-sidebar">
+            <DataPreview
+              data={pendingData}
+              onCommit={handleCommit}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
       </main>
     </div>
   );
-}
+}  // ← this closing brace was missing
 
 export default App;

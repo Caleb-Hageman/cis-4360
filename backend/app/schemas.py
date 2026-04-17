@@ -11,6 +11,9 @@ class ChatRequest(BaseModel):
     user_profile: UserProfile
     system_override: Optional[str] = None
     thread_id: Optional[str] = "default_thread"
+    agent_role: Optional[str] = None
+    decomp_instructions: Optional[List[str]] = None
+    scaff_instructions: Optional[List[str]] = None
 
 class ExtractionPreview(BaseModel):
     proposed_row: Dict[str, str]

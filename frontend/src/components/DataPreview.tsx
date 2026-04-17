@@ -23,15 +23,14 @@ export default function DataPreview({ data, onCommit, isLoading }: Props) {
           {Object.entries(data).map(([key, value]) => (
             <tr key={key}>
               <th>{key}</th>
-              <td>{value?.toString() || <span className="null-value">empty</span>}</td>
+              <td>{value?.toString() ?? <span className="null-value">empty</span>}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      
-      <button 
-        className="commit-btn" 
-        onClick={onCommit} 
+      <button
+        className="commit-btn"
+        onClick={onCommit}
         disabled={isLoading}
       >
         {isLoading ? 'Posting to Sheets...' : 'Confirm & Post to Google Sheets'}
