@@ -13,3 +13,12 @@ export type AuthUser = {
   name?: string;
   picture?: string;
 };
+
+export type UserProfile = {
+  name: string;
+  experienceLevel: string;
+  primaryLanguage: string;
+  leetcodeGoals: string;
+  problemsSolved: number;
+  dateFormat: string;
+};

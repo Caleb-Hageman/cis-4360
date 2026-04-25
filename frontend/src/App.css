@@ -104,13 +104,17 @@
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 250px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(78vh, 680px);
+  overflow-y: auto;
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
   background: rgba(8, 15, 29, 0.96);
   box-shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
   padding: 16px;
   z-index: 30;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
 .profile-dropdown__header {
@@ -145,6 +149,28 @@
   font-size: 0.88rem;
 }
 
+.profile-auth-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.profile-auth-state__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  color: #b8f7cb;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .profile-field {
   display: block;
   margin-bottom: 14px;
@@ -167,13 +193,33 @@
   outline: none;
 }
 
+.profile-field select,
+.profile-field textarea {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text-main);
+  padding: 12px 14px;
+  outline: none;
+}
+
 .profile-field input:focus {
   border-color: rgba(96, 165, 250, 0.6);
 }
 
+.profile-field select:focus,
+.profile-field textarea:focus {
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.profile-field textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
 .profile-action {
   width: 100%;
-  margin-top: 16px;
   border: none;
   border-radius: 14px;
   padding: 12px 14px;
@@ -181,6 +227,13 @@
   color: #082032;
   font-weight: 700;
   cursor: pointer;
+}
+
+.profile-action--secondary {
+  width: auto;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.24);
 }
 
 .main-content {

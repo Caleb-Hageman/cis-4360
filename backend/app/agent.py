@@ -1,65 +1,167 @@
-import os
 import json
-from typing import TypedDict
-from langgraph.graph import StateGraph, END
-from prompt_template import DataExtractionTemplate
+import os
+import atexit
 from datetime import datetime
+from pathlib import Path
+from typing import Any, TypedDict
+
 from google import genai
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, StateGraph
+from prompt_template import DataExtractionTemplate
 
-# Initialize the Gemini Client
-# Ensure GEMINI_API_KEY is in your .env
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+CHECKPOINT_DB_PATH = os.getenv(
+    "LANGGRAPH_CHECKPOINT_DB",
+    str(Path(__file__).resolve().parent.parent / "checkpoints.db"),
+)
 
-class AgentState(TypedDict):
+
+class AgentState(TypedDict, total=False):
     user_message: str
-    headers: list
-    proposed_data: dict
+    headers: list[str]
+    proposed_data: dict[str, Any]
+    reply: str
+    user_profile: dict[str, Any]
+    system_prompt: str
     agent_role: str
     decomp_instructions: list[str]
     scaff_instructions: list[str]
+    conversation_history: list[dict[str, str]]
+
+
+def format_profile_context(user_profile: dict[str, Any]) -> str:
+    if not user_profile:
+        return "No user profile provided."
+
+    profile_lines = [
+        f"Name: {user_profile.get('name') or 'Unknown'}",
+        f"Experience Level: {user_profile.get('experience_level') or 'Unspecified'}",
+        f"Primary Language: {user_profile.get('primary_language') or 'Unspecified'}",
+        f"LeetCode Goals: {user_profile.get('leetcode_goals') or 'Unspecified'}",
+        f"Problems Solved: {user_profile.get('problems_solved', 0)}",
+        f"Date Format: {user_profile.get('date_format') or 'MM/DD/YYYY'}",
+    ]
+
+    preferences = user_profile.get("preferences") or {}
+    if preferences:
+        safe_preferences = json.dumps(preferences, ensure_ascii=True).replace("{", "{{").replace("}", "}}")
+        profile_lines.append(f"Preferences: {safe_preferences}")
+
+    return "\n".join(profile_lines)
+
+
+def format_history_context(history: list[dict[str, str]]) -> str:
+    if not history:
+        return "No prior conversation."
+
+    recent_messages = history[-6:]
+    return "\n".join(
+        f"{message.get('role', 'unknown').title()}: {message.get('content', '')}"
+        for message in recent_messages
+    )
+
+
+def normalize_row(
+    headers: list[str],
+    previous_row: dict[str, Any],
+    parsed_row: dict[str, Any],
+) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for header in headers:
+        if header in parsed_row:
+            normalized[header] = parsed_row[header]
+        elif header in previous_row:
+            normalized[header] = previous_row[header]
+        else:
+            normalized[header] = None
+    return normalized
 
 
 def extraction_node(state: AgentState):
-    """
-    Calls Gemini to map user text to the spreadsheet headers.
-    """
     role = state.get("agent_role") or os.getenv("AGENT_ROLE")
-    decomp = state.get("decomp_instructions") or [s.strip() for s in os.getenv("DECOMP_INSTRUCTIONS", "").split(",")]
-    scaff = state.get("scaff_instructions") or [s.strip() for s in os.getenv("SCAFF_INSTRUCTIONS", "").split(",")]
+    decomp = state.get("decomp_instructions") or [
+        s.strip() for s in os.getenv("DECOMP_INSTRUCTIONS", "").split(",") if s.strip()
+    ]
+    scaff = state.get("scaff_instructions") or [
+        s.strip() for s in os.getenv("SCAFF_INSTRUCTIONS", "").split(",") if s.strip()
+    ]
 
     headers = state.get("headers", [])
     user_msg = state.get("user_message", "")
-
+    user_profile = state.get("user_profile", {})
+    previous_row = state.get("proposed_data") or {}
+    prior_history = list(state.get("conversation_history", []))
     today = datetime.now().strftime("%Y-%m-%d")
 
     template = (
-        DataExtractionTemplate("Extract LeetCode data from: {user_msg}")
+        DataExtractionTemplate("Extract or update LeetCode spreadsheet data from: {user_msg}")
         .with_role(role)
-        .with_context(f"The spreadsheet has these columns: {', '.join(headers)}")
+        .with_context(
+            "\n".join(
+                [
+                    f"The spreadsheet has these columns: {', '.join(headers)}",
+                    f"User profile:\n{format_profile_context(user_profile)}",
+                    f"Prior conversation:\n{format_history_context(prior_history)}",
+                    (
+                        "Existing draft row:\n"
+                        f"{json.dumps(previous_row, ensure_ascii=True).replace('{', '{{').replace('}', '}}') if previous_row else 'No existing draft yet.'}"
+                    ),
+                    (
+                        "If the user asks to revise or improve the draft, update the existing draft "
+                        "instead of starting from scratch. Preserve prior fields unless the user "
+                        "explicitly changes or contradicts them."
+                    ),
+                ]
+            )
+        )
         .structured_decomposition(decomp)
         .constraint_scaffolding(scaff)
         .with_output_format("A raw JSON object matching the headers exactly.")
     )
 
     formatted_instruction = template.full_prompt(user_msg=user_msg, today=today)
+    if state.get("system_prompt"):
+        formatted_instruction = f"{state['system_prompt']}\n\n{formatted_instruction}"
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=formatted_instruction # Use the combined prompt here
+        contents=formatted_instruction,
+    )
+
+    reply = (
+        "I updated the current draft using your latest instructions."
+        if previous_row
+        else "I've prepared a preview of the data for your spreadsheet."
     )
 
     try:
         text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        proposed_row = json.loads(text)
-    except Exception as e:
-        print(f"Parsing error: {e}")
-        proposed_row = {h: None for h in headers} 
+        parsed_row = json.loads(text)
+        proposed_row = normalize_row(headers, previous_row, parsed_row)
+    except Exception as exc:
+        print(f"Parsing error: {exc}")
+        proposed_row = normalize_row(headers, previous_row, {})
 
-    return {"proposed_data": proposed_row}
+    updated_history = prior_history + [
+        {"role": "user", "content": user_msg},
+        {"role": "assistant", "content": reply},
+    ]
 
-# Define the Graph
+    return {
+        "proposed_data": proposed_row,
+        "reply": reply,
+        "user_profile": user_profile,
+        "conversation_history": updated_history[-12:],
+    }
+
+
 workflow = StateGraph(AgentState)
 workflow.add_node("extract", extraction_node)
 workflow.set_entry_point("extract")
 workflow.add_edge("extract", END)
-graph = workflow.compile()
+
+memory_manager = SqliteSaver.from_conn_string(CHECKPOINT_DB_PATH)
+memory = memory_manager.__enter__()
+atexit.register(memory_manager.__exit__, None, None, None)
+graph = workflow.compile(checkpointer=memory)

@@ -57,6 +57,11 @@ def get_session_tokens(request: Request):
     return request.session.get("google_tokens")
 
 
+def get_thread_id(request: Request, fallback: str | None = None):
+    session_user = get_session_user(request) or {}
+    return session_user.get("email") or fallback or "default_thread"
+
+
 @app.get("/api/auth/google/start")
 async def google_auth_start(request: Request):
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
@@ -126,6 +131,19 @@ async def auth_me(request: Request):
     return {"user": get_session_user(request)}
 
 
+@app.get("/api/chat/history")
+async def chat_history(request: Request, thread_id: str | None = None):
+    resolved_thread_id = get_thread_id(request, thread_id)
+    state = graph.get_state({"configurable": {"thread_id": resolved_thread_id}})
+    values = state.values or {}
+
+    return {
+        "thread_id": resolved_thread_id,
+        "messages": values.get("conversation_history", []),
+        "preview": values.get("proposed_data"),
+    }
+
+
 @app.post("/api/auth/logout")
 async def auth_logout(request: Request):
     request.session.clear()
@@ -138,17 +156,24 @@ async def chat_endpoint(req: ChatRequest, request: Request):
         raise HTTPException(status_code=400, detail="Spreadsheet ID missing")
 
     headers = get_sheet_headers(sheet_id, user_tokens=get_session_tokens(request))
-    
+    thread_id = get_thread_id(request, req.thread_id)
+
     inputs = {
         "user_message": req.message,
         "system_prompt": req.system_override or "Default prompt",
-        "headers": headers
+        "headers": headers,
+        "user_profile": req.user_profile.model_dump(),
+        "agent_role": req.agent_role,
+        "decomp_instructions": req.decomp_instructions,
+        "scaff_instructions": req.scaff_instructions,
     }
-    result = graph.invoke(inputs)
+    config = {"configurable": {"thread_id": thread_id}}
+    result = graph.invoke(inputs, config=config)
     
     return {
-        "reply": "I've prepared a preview of the data for your spreadsheet.",
-        "preview": result["proposed_data"]
+        "reply": result.get("reply", "I've prepared a preview of the data for your spreadsheet."),
+        "preview": result["proposed_data"],
+        "thread_id": thread_id,
     }
 
 @app.post("/api/commit")
@@ -163,4 +188,23 @@ async def commit_endpoint(req: CommitRequest, request: Request):
     row_to_append = [row_dict.get(header, "") for header in ordered_headers]
     
     append_to_sheet(sheet_id, row_to_append, user_tokens=get_session_tokens(request))
+    thread_id = get_thread_id(request, req.thread_id)
+    config = {"configurable": {"thread_id": thread_id}}
+    state = graph.get_state(config)
+    values = state.values or {}
+    conversation_history = list(values.get("conversation_history", []))
+    conversation_history.append(
+        {
+            "role": "assistant",
+            "content": "Posted to Google Sheets. The current draft is closed, but you can keep chatting to start a new one.",
+        }
+    )
+    graph.update_state(
+        config,
+        {
+            "proposed_data": None,
+            "conversation_history": conversation_history[-12:],
+        },
+        as_node="extract",
+    )
     return {"status": "success"}

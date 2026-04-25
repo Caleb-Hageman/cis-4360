@@ -1,9 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 
 class UserProfile(BaseModel):
     name: str
-    preferences: Dict[str, str] = {}
+    experience_level: str = ""
+    primary_language: str = ""
+    leetcode_goals: str = ""
+    problems_solved: int = 0
+    preferences: Dict[str, str] = Field(default_factory=dict)
     date_format: str = "MM/DD/YYYY"
 
 class ChatRequest(BaseModel):
@@ -11,7 +15,7 @@ class ChatRequest(BaseModel):
     user_profile: UserProfile
     spreadsheet_id: Optional[str] = None
     system_override: Optional[str] = None
-    thread_id: Optional[str] = "default_thread"
+    thread_id: Optional[str] = None
     agent_role: Optional[str] = None
     decomp_instructions: Optional[List[str]] = None
     scaff_instructions: Optional[List[str]] = None
@@ -24,3 +28,4 @@ class ExtractionPreview(BaseModel):
 class CommitRequest(BaseModel):
     data: Dict[str, Any]
     spreadsheet_id: Optional[str] = None
+    thread_id: Optional[str] = None

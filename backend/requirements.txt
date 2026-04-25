@@ -24,6 +24,7 @@ jsonschema-specifications==2025.9.1
 langchain-core==1.2.30
 langgraph==1.1.6
 langgraph-checkpoint==4.0.2
+langgraph-checkpoint-sqlite==3.0.3
 langgraph-prebuilt==1.0.9
 langgraph-sdk==0.3.13
 langsmith==0.7.32
