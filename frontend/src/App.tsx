@@ -21,6 +21,9 @@ const DEFAULT_PROFILE: UserProfile = {
   leetcodeGoals: '',
   problemsSolved: 0,
   dateFormat: 'MM/DD/YYYY',
+  agentRole: '',
+  decompInstructions: '',
+  scaffInstructions: '',
 };
 
 function sanitizeStorageScope(email?: string | null) {
@@ -45,6 +48,13 @@ function createThreadId() {
   return crypto.randomUUID();
 }
 
+function mergeProfile(partial: Partial<UserProfile> | null | undefined): UserProfile {
+  return {
+    ...DEFAULT_PROFILE,
+    ...(partial ?? {}),
+  };
+}
+
 function App() {
   const [messages, setMessages] = useState<Message[]>(
     () => loadStoredValue(getStorageKey(STORAGE_KEYS.messages), []),
@@ -59,7 +69,7 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile>(
-    () => loadStoredValue(getStorageKey(STORAGE_KEYS.profile), DEFAULT_PROFILE),
+    () => mergeProfile(loadStoredValue(getStorageKey(STORAGE_KEYS.profile), null)),
   );
   const [spreadsheetId, setSpreadsheetId] = useState(
     () => localStorage.getItem(getStorageKey(STORAGE_KEYS.spreadsheetId)) ?? '',
@@ -102,10 +112,10 @@ function App() {
       return;
     }
 
-    const storedProfile = loadStoredValue(
+    const storedProfile = mergeProfile(loadStoredValue(
       getStorageKey(STORAGE_KEYS.profile, userEmail),
-      DEFAULT_PROFILE,
-    );
+      null,
+    ));
     const storedSpreadsheetId =
       localStorage.getItem(getStorageKey(STORAGE_KEYS.spreadsheetId, userEmail)) ?? '';
 
@@ -203,6 +213,23 @@ function App() {
     },
   });
 
+  const parseInstructionList = (value: string) =>
+    value
+      .split(/\r?\n|,/)
+      .map(item => item.trim())
+      .filter(Boolean);
+
+  const buildPromptOverrides = () => {
+    const decompInstructions = parseInstructionList(profile.decompInstructions);
+    const scaffInstructions = parseInstructionList(profile.scaffInstructions);
+
+    return {
+      ...(profile.agentRole.trim() ? { agent_role: profile.agentRole.trim() } : {}),
+      ...(decompInstructions.length > 0 ? { decomp_instructions: decompInstructions } : {}),
+      ...(scaffInstructions.length > 0 ? { scaff_instructions: scaffInstructions } : {}),
+    };
+  };
+
   const handleSendMessage = async (text: string) => {
     const newUserMsg: Message = { role: 'user', content: text };
     setMessages(prev => [...prev, newUserMsg]);
@@ -218,6 +245,7 @@ function App() {
           spreadsheet_id: spreadsheetId || undefined,
           thread_id: activeThreadId,
           user_profile: getRequestProfile(),
+          ...buildPromptOverrides(),
         }),
       });
 
@@ -291,6 +319,38 @@ function App() {
     }
   };
 
+  const handleDeleteDraft = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/draft/delete`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thread_id: activeThreadId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delete draft failed with status ${response.status}`);
+      }
+
+      setPendingData(null);
+      setPendingReport(null);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Draft deleted. You can keep chatting to start a new one.',
+        },
+      ]);
+    } catch (error) {
+      console.error('Delete draft failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/google/start`, {
@@ -356,6 +416,7 @@ function App() {
               data={pendingData}
               report={pendingReport}
               onCommit={handleCommit}
+              onDelete={handleDeleteDraft}
               isLoading={isLoading}
             />
           </aside>

@@ -124,6 +124,33 @@ export default function ProfileSettings({
               />
             </label>
             <label className="profile-field">
+              <span>Agent Role</span>
+              <input
+                type="text"
+                value={profile.agentRole}
+                onChange={(e) => updateProfile('agentRole', e.target.value)}
+                placeholder="Optional persona override"
+              />
+            </label>
+            <label className="profile-field">
+              <span>Decomposition Instructions</span>
+              <textarea
+                value={profile.decompInstructions}
+                onChange={(e) => updateProfile('decompInstructions', e.target.value)}
+                placeholder="Optional comma- or line-separated instructions"
+                rows={3}
+              />
+            </label>
+            <label className="profile-field">
+              <span>Constraint Scaffolding</span>
+              <textarea
+                value={profile.scaffInstructions}
+                onChange={(e) => updateProfile('scaffInstructions', e.target.value)}
+                placeholder="Optional comma- or line-separated constraints"
+                rows={3}
+              />
+            </label>
+            <label className="profile-field">
               <span>Spreadsheet ID</span>
               <input
                 type="text"

@@ -10,7 +10,7 @@ from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
 from starlette.middleware.sessions import SessionMiddleware
 
-from .schemas import ChatRequest, CommitRequest
+from .schemas import ChatRequest, CommitRequest, DeleteDraftRequest
 from .agent import graph
 from .mcp_tools import get_sheet_headers, append_to_sheet
 
@@ -177,6 +177,21 @@ async def chat_endpoint(req: ChatRequest, request: Request):
         "report": result.get("summary_report"),
         "thread_id": thread_id,
     }
+
+@app.post("/api/draft/delete")
+async def delete_draft_endpoint(req: DeleteDraftRequest, request: Request):
+    thread_id = get_thread_id(request, req.thread_id)
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    graph.update_state(
+        config,
+        {
+            "proposed_data": None,
+            "summary_report": None,
+        },
+        as_node="extract",
+    )
+    return {"status": "success"}
 
 @app.post("/api/commit")
 async def commit_endpoint(req: CommitRequest, request: Request):

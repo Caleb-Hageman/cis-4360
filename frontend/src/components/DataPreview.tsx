@@ -1,13 +1,24 @@
+import { useEffect, useRef } from 'react';
 import type { SheetRow, SummaryReport } from '../types';
 
 interface Props {
   data: SheetRow | null;
   report: SummaryReport | null;
   onCommit: () => void;
+  onDelete: () => void;
   isLoading: boolean;
 }
 
-export default function DataPreview({ data, report, onCommit, isLoading }: Props) {
+export default function DataPreview({ data, report, onCommit, onDelete, isLoading }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to top when a new draft or report arrives
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [data, report]);
+
   if (!data && !report) {
     return (
       <div className="preview-empty">
@@ -17,7 +28,7 @@ export default function DataPreview({ data, report, onCommit, isLoading }: Props
   }
 
   return (
-    <div className="data-preview-card">
+    <div className="data-preview-card" ref={containerRef} style={{ maxHeight: '100%', overflowY: 'auto' }}>
       {report && (
         <section className="preview-report">
           <span className="preview-section-label">Summary Report</span>
@@ -70,6 +81,13 @@ export default function DataPreview({ data, report, onCommit, isLoading }: Props
             disabled={isLoading}
           >
             {isLoading ? 'Posting to Sheets...' : 'Confirm & Post to Google Sheets'}
+          </button>
+          <button
+            className="delete-draft-btn"
+            onClick={onDelete}
+            disabled={isLoading}
+          >
+            Delete Draft
           </button>
         </>
       )}

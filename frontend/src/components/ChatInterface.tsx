@@ -8,7 +8,14 @@ interface Props {
 
 export default function ChatInterface({ messages, onSendMessage }: Props) {
   const [input, setInput] = useState('');
+  const [expandedIndices, setExpandedIndices] = useState<number[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const toggleExpand = (index: number) => {
+    setExpandedIndices((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
+  };
   const messageListRef = useRef<HTMLDivElement>(null);
   const trimmedInput = input.trim();
   const estimatedTokens = Math.max(0, Math.ceil(input.length / 4));
@@ -56,6 +63,39 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
             <div key={i} className={`message-row ${msg.role}`}>
               <div className={`message-bubble ${msg.role}`}>
                 <p>{msg.content}</p>
+                {msg.preview && (
+                  <div className="message-preview">
+                    <div className="message-preview__header">
+                      <span>Draft Extraction</span>
+                    </div>
+                    <table className="message-preview__table">
+                      <tbody>
+                        {Object.entries(msg.preview)
+                          .slice(0, expandedIndices.includes(i) ? undefined : 4)
+                          .map(([key, value]) => (
+                            <tr key={key}>
+                              <th>{key}</th>
+                              <td>{value?.toString() || '-'}</td>
+                            </tr>
+                          ))}
+                        {Object.keys(msg.preview).length > 4 && (
+                          <tr>
+                            <td 
+                              colSpan={2} 
+                              className="more-rows"
+                              onClick={() => toggleExpand(i)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {expandedIndices.includes(i) 
+                                ? '↑ Show less' 
+                                : `+ ${Object.keys(msg.preview).length - 4} more fields...`}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           ))
@@ -73,11 +113,6 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
               onKeyDown={handleKeyDown}
               placeholder="I solved 'Two Sum' today..."
             />
-            <div className="composer-meta">
-              <span>Gemini 2.5 Flash</span>
-              <span>{input.length} chars</span>
-              <span>~{estimatedTokens} tokens</span>
-            </div>
           </div>
           <button
             type="button"
@@ -100,6 +135,11 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
               <polyline points="12 5 19 12 12 19" />
             </svg>
           </button>
+        </div>
+        <div className="composer-meta">
+          <span>Gemini 2.5 Flash</span>
+          <span>{input.length} chars</span>
+          <span>~{estimatedTokens} tokens</span>
         </div>
       </div>
     </section>

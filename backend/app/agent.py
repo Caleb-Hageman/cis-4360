@@ -118,6 +118,7 @@ def extraction_node(state: AgentState):
     template = (
         DataExtractionTemplate("Extract or update LeetCode spreadsheet data from: {user_msg}")
         .with_role(role)
+        .with_chain_of_thought()
         .with_context(
             "\n".join(
                 [

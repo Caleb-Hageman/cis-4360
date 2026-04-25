@@ -30,6 +30,9 @@ class CommitRequest(BaseModel):
     spreadsheet_id: Optional[str] = None
     thread_id: Optional[str] = None
 
+class DeleteDraftRequest(BaseModel):
+    thread_id: Optional[str] = None
+
 
 class SummaryReport(BaseModel):
     headline: str

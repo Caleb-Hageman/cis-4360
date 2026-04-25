@@ -28,4 +28,7 @@ export type UserProfile = {
   leetcodeGoals: string;
   problemsSolved: number;
   dateFormat: string;
+  agentRole: string;
+  decompInstructions: string;
+  scaffInstructions: string;
 };
