@@ -21,6 +21,7 @@ class AgentState(TypedDict, total=False):
     user_message: str
     headers: list[str]
     proposed_data: dict[str, Any]
+    summary_report: dict[str, Any]
     reply: str
     user_profile: dict[str, Any]
     system_prompt: str
@@ -78,6 +79,26 @@ def normalize_row(
     return normalized
 
 
+def normalize_report(parsed_report: dict[str, Any] | None) -> dict[str, Any]:
+    report = parsed_report or {}
+    observations = report.get("observations")
+    recommendations = report.get("recommendations")
+
+    return {
+        "headline": str(report.get("headline") or "Draft Analysis"),
+        "summary": str(
+            report.get("summary")
+            or "The assistant prepared a spreadsheet-ready draft and accompanying analysis."
+        ),
+        "observations": [str(item) for item in observations] if isinstance(observations, list) else [],
+        "recommendations": [str(item) for item in recommendations] if isinstance(recommendations, list) else [],
+    }
+
+
+def escape_for_prompt_template(value: str) -> str:
+    return value.replace("{", "{{").replace("}", "}}")
+
+
 def extraction_node(state: AgentState):
     role = state.get("agent_role") or os.getenv("AGENT_ROLE")
     decomp = state.get("decomp_instructions") or [
@@ -117,7 +138,23 @@ def extraction_node(state: AgentState):
         )
         .structured_decomposition(decomp)
         .constraint_scaffolding(scaff)
-        .with_output_format("A raw JSON object matching the headers exactly.")
+        .with_output_format(
+            escape_for_prompt_template(
+                (
+                "A raw JSON object with this exact shape:\n"
+                "{\n"
+                '  "row": { "Header Name": "value" },\n'
+                '  "report": {\n'
+                '    "headline": "short title",\n'
+                '    "summary": "2-4 sentence analysis",\n'
+                '    "observations": ["insight 1", "insight 2"],\n'
+                '    "recommendations": ["next step 1", "next step 2"]\n'
+                "  }\n"
+                "}\n"
+                "The row keys must match the spreadsheet headers exactly. The report must be generated fresh from the user's work, draft, profile, and history, not boilerplate."
+                )
+            )
+        )
     )
 
     formatted_instruction = template.full_prompt(user_msg=user_msg, today=today)
@@ -137,11 +174,15 @@ def extraction_node(state: AgentState):
 
     try:
         text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        parsed_row = json.loads(text)
+        parsed_payload = json.loads(text)
+        parsed_row = parsed_payload.get("row", parsed_payload)
+        parsed_report = parsed_payload.get("report", {})
         proposed_row = normalize_row(headers, previous_row, parsed_row)
+        summary_report = normalize_report(parsed_report)
     except Exception as exc:
         print(f"Parsing error: {exc}")
         proposed_row = normalize_row(headers, previous_row, {})
+        summary_report = normalize_report(None)
 
     updated_history = prior_history + [
         {"role": "user", "content": user_msg},
@@ -150,6 +191,7 @@ def extraction_node(state: AgentState):
 
     return {
         "proposed_data": proposed_row,
+        "summary_report": summary_report,
         "reply": reply,
         "user_profile": user_profile,
         "conversation_history": updated_history[-12:],

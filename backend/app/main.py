@@ -141,6 +141,7 @@ async def chat_history(request: Request, thread_id: str | None = None):
         "thread_id": resolved_thread_id,
         "messages": values.get("conversation_history", []),
         "preview": values.get("proposed_data"),
+        "report": values.get("summary_report"),
     }
 
 
@@ -173,6 +174,7 @@ async def chat_endpoint(req: ChatRequest, request: Request):
     return {
         "reply": result.get("reply", "I've prepared a preview of the data for your spreadsheet."),
         "preview": result["proposed_data"],
+        "report": result.get("summary_report"),
         "thread_id": thread_id,
     }
 
@@ -184,8 +186,11 @@ async def commit_endpoint(req: CommitRequest, request: Request):
         raise HTTPException(status_code=400, detail="Spreadsheet ID missing")
     
     row_dict = req.data
-    ordered_headers = ["Problem Name", "Difficulty", "Date", "Pattern", "Solution Process", "Link"]
-    row_to_append = [row_dict.get(header, "") for header in ordered_headers]
+    live_headers = get_sheet_headers(sheet_id, user_tokens=get_session_tokens(request))
+    if not live_headers:
+        raise HTTPException(status_code=400, detail="No spreadsheet headers found")
+
+    row_to_append = [row_dict.get(header, "") for header in live_headers]
     
     append_to_sheet(sheet_id, row_to_append, user_tokens=get_session_tokens(request))
     thread_id = get_thread_id(request, req.thread_id)
@@ -203,6 +208,7 @@ async def commit_endpoint(req: CommitRequest, request: Request):
         config,
         {
             "proposed_data": None,
+            "summary_report": None,
             "conversation_history": conversation_history[-12:],
         },
         as_node="extract",

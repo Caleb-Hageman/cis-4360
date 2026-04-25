@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import ChatInterface from './components/ChatInterface';
 import DataPreview from './components/DataPreview';
 import ProfileSettings from './components/ProfileSettings';
-import type { AuthUser, Message, SheetRow, UserProfile } from './types';
+import type { AuthUser, Message, SheetRow, SummaryReport, UserProfile } from './types';
 import './App.css';
 
 const STORAGE_KEYS = {
   messages: 'chatMessages',
   pendingData: 'pendingDraftPreview',
+  pendingReport: 'pendingDraftReport',
   profile: 'userProfile',
   spreadsheetId: 'spreadsheetId',
   threadId: 'chatThreadId',
@@ -51,6 +52,9 @@ function App() {
   const [pendingData, setPendingData] = useState<SheetRow | null>(
     () => loadStoredValue(getStorageKey(STORAGE_KEYS.pendingData), null),
   );
+  const [pendingReport, setPendingReport] = useState<SummaryReport | null>(
+    () => loadStoredValue(getStorageKey(STORAGE_KEYS.pendingReport), null),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -71,6 +75,7 @@ function App() {
   const resetUiState = () => {
     setMessages([]);
     setPendingData(null);
+    setPendingReport(null);
     setSpreadsheetId('');
     setProfile(DEFAULT_PROFILE);
     setThreadId(createThreadId());
@@ -130,10 +135,12 @@ function App() {
 
         setMessages(restoredMessages);
         setPendingData((data.preview as SheetRow | null) ?? null);
+        setPendingReport((data.report as SummaryReport | null) ?? null);
       } catch (error) {
         console.error('History lookup failed:', error);
         setMessages(loadStoredValue(getStorageKey(STORAGE_KEYS.messages, userEmail), []));
         setPendingData(loadStoredValue(getStorageKey(STORAGE_KEYS.pendingData, userEmail), null));
+        setPendingReport(loadStoredValue(getStorageKey(STORAGE_KEYS.pendingReport, userEmail), null));
       }
     };
 
@@ -163,6 +170,13 @@ function App() {
       JSON.stringify(pendingData),
     );
   }, [pendingData, userEmail]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      getStorageKey(STORAGE_KEYS.pendingReport, userEmail),
+      JSON.stringify(pendingReport),
+    );
+  }, [pendingReport, userEmail]);
 
   useEffect(() => {
     localStorage.setItem(getStorageKey(STORAGE_KEYS.profile, userEmail), JSON.stringify(profile));
@@ -220,6 +234,7 @@ function App() {
 
       setMessages(prev => [...prev, newAssistantMsg]);
       setPendingData(data.preview);
+      setPendingReport((data.report as SummaryReport | null) ?? null);
       if (!userEmail && data.thread_id) {
         setThreadId(data.thread_id);
       }
@@ -268,6 +283,7 @@ function App() {
         },
       ]);
       setPendingData(null);
+      setPendingReport(null);
     } catch (error) {
       console.error('Commit failed:', error);
     } finally {
@@ -334,10 +350,11 @@ function App() {
             onSendMessage={handleSendMessage}
           />
         </div>
-        {pendingData && (
+        {(pendingData || pendingReport) && (
           <aside className="preview-sidebar">
             <DataPreview
               data={pendingData}
+              report={pendingReport}
               onCommit={handleCommit}
               isLoading={isLoading}
             />

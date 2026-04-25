@@ -8,6 +8,13 @@ export type Message = {
   preview?: SheetRow;
 };
 
+export type SummaryReport = {
+  headline: string;
+  summary: string;
+  observations: string[];
+  recommendations: string[];
+};
+
 export type AuthUser = {
   email?: string;
   name?: string;

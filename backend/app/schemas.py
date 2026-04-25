@@ -29,3 +29,10 @@ class CommitRequest(BaseModel):
     data: Dict[str, Any]
     spreadsheet_id: Optional[str] = None
     thread_id: Optional[str] = None
+
+
+class SummaryReport(BaseModel):
+    headline: str
+    summary: str
+    observations: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)

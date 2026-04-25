@@ -362,6 +362,11 @@
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
 }
 
+.composer-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .input-wrapper:focus-within {
   border-color: rgba(96, 165, 250, 0.6);
 }
@@ -376,6 +381,15 @@
   font: inherit;
   line-height: 1.5;
   outline: none;
+}
+
+.composer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
 .input-wrapper textarea::placeholder {
@@ -425,6 +439,52 @@
 .data-preview-card h3 {
   margin: 0 0 18px;
   font-size: 1.1rem;
+}
+
+.preview-section-label {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  color: #bae6fd;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preview-report {
+  margin-bottom: 24px;
+}
+
+.preview-report__summary {
+  color: var(--text-main);
+  line-height: 1.65;
+}
+
+.preview-report__block {
+  margin-top: 18px;
+}
+
+.preview-report__block h4,
+.preview-table-header h4 {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+}
+
+.preview-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}
+
+.preview-list li + li {
+  margin-top: 8px;
+}
+
+.preview-table-header {
+  margin-bottom: 14px;
 }
 
 .preview-table {

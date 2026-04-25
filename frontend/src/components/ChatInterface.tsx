@@ -10,6 +10,8 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const trimmedInput = input.trim();
+  const estimatedTokens = Math.max(0, Math.ceil(input.length / 4));
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -25,7 +27,7 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
   }, [messages]);
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!trimmedInput) return;
     onSendMessage(input);
     setInput('');
   };
@@ -62,19 +64,26 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
 
       <div className="input-container">
         <div className="input-wrapper">
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="I solved 'Two Sum' today..."
-          />
+          <div className="composer-main">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="I solved 'Two Sum' today..."
+            />
+            <div className="composer-meta">
+              <span>Gemini 2.5 Flash</span>
+              <span>{input.length} chars</span>
+              <span>~{estimatedTokens} tokens</span>
+            </div>
+          </div>
           <button
             type="button"
             className="send-arrow-btn"
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!trimmedInput}
             aria-label="Send"
           >
             <svg
