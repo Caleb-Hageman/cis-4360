@@ -10,11 +10,71 @@ LeetCode Tracker AI is a chat-integrated workspace designed to seamlessly extrac
 The application implements a full Agentic Workflow with Tool Calling, satisfying the **Conceptual System Architecture** requirements:
 
 1. **User Interface:** A React (Vite) frontend provides a chat interface, a profile settings panel for prompt customization, and a live data preview sidebar.
-2. **Prompt Engineering:** The backend constructs prompts combining user profile data (experience, goals, preferences) and specific formatting instructions derived from the spreadsheet schema.
+2. **Prompt Engineering:** The system uses a **Prompt Constructor** (`backend/prompt_template.py`) that employs a fluent interface pattern to programmatically "bake" the prompt. It combines user profile data, live sheet headers, and conversation history into a cohesive, context-aware instruction set.
 3. **Advanced Technique (LangGraph Agent & Tool Calling):** The backend utilizes **LangGraph** to maintain a stateful conversation thread. It employs **Tool Calling** to interact with the Google Sheets API (fetching live headers and appending rows).
 4. **LLM Integration:** The agent reasons through the user's input using the LLM (Gemini 2.5 Flash), extracting relevant fields (e.g., Problem Name, Difficulty, Approach) that match the sheet's columns.
 5. **Iterative Refinement:** The extracted data is returned as a "Draft" to the frontend. The user can submit follow-up refinements in the chat. The agent updates the draft in its state, and the UI maintains an expandable history of these iterations within the chat thread before the user finally commits the data to Google Sheets.
 
+### System Architecture
+```mermaid
+graph TD
+    subgraph "1. FRONT-END (React/Vite)"
+        UI[Chat Interface]
+        Profile[Profile Settings Panel]
+        Preview[Data Preview Sidebar]
+    end
+
+    subgraph "2. PROMPT ENGINEERING LAYER"
+        PL[System Prompt Constructor]
+        Headers[Dynamic Header Injection]
+        Context[User Profile Context]
+    end
+
+    subgraph "3. ADVANCED TECHNIQUE (LangGraph Agent)"
+        LG{LangGraph Orchestrator}
+        TC[Tool Calling: Google Sheets API]
+        State[(Thread State Management)]
+    end
+
+    subgraph "4. LLM INTEGRATION"
+        LLM[Gemini 2.5 Flash]
+    end
+
+    %% Flow
+    User((User)) --> UI
+    UI --> PL
+    Profile --> Context
+    Context --> PL
+    PL --> LG
+    Headers --> PL
+    LG --> TC
+    LG <--> State
+    LG <--> LLM
+    TC <--> GS[(Google Sheets)]
+```
+
+### Technical Implementation & Design Rationale
+
+#### 1. Agentic Orchestration (LangGraph)
+Standard LLM chains are linear and "forgetful." By using **LangGraph**, the system maintains a stateful graph where the "proposed draft" is a persistent variable in the agent's memory. This allows for complex, multi-turn refinements where the user can correct specific fields without the agent losing track of the rest of the extraction.
+
+#### 2. Dynamic Schema Discovery (Tool Calling)
+Hard-coding spreadsheet columns (e.g., "Problem", "Date") makes an application static and less useful. I implemented a **Tool-Calling** pattern where the agent first calls `get_sheet_headers`. This "grounds" the LLM in the live reality of the user's specific spreadsheet, allowing the same agent to work across different tracking templates without code changes.
+
+#### 3. Human-in-the-Loop (Refinement Loop)
+Directly writing AI output to a database is risky. The **Draft-Preview-Commit** architecture ensures that the user acts as a final validator. The UI design facilitates this by providing **expandable snapshots** in the chat thread, allowing the user to track how the data evolved through their refinements before finally persisting it to Google Sheets.
+
+#### 4. Frontend-driven Context (Prompt Engineering)
+To make the AI feel personalized, the system injects the **User Profile** (experience, goals, preferences) into the system prompt at the start of every thread. This ensures that the "Summary Report" and "Observations" are contextually relevant to the specific user's learning journey, rather than being generic AI feedback.
+
+#### 5. State Persistence & Threading
+Bridging the gap between stateless HTTP requests and stateful AI sessions was accomplished by utilizing a **Thread ID** system (mapping to the user's Google Email or a unique UUID) that serves as a primary key in the backend's state manager. This ensures that even if the user refreshes their browser, the iterative refinement loop remains intact.
+
+#### 6. Prompt Construction
+Rather than using static strings, we implemented a **`PromptTemplate`** class that allows the backend to chain instructions together (e.g., `.with_role().with_context().with_constraints()`). This "Baking" process ensures that each part of the prompt process (**decomposition**, **validation**, and **format)** is clearly isolated, reducing LLM hallucinations and improving reliability.
+
+
+### Data Flow (Sequence Diagram)
 ```mermaid
 sequenceDiagram
     autonumber
@@ -56,10 +116,10 @@ sequenceDiagram
 ```
 
 ### Description of Stages
-1. **Discovery:** The system dynamically fetches headers from Google Sheets so the AI knows the exact schema.
-2. **Extraction:** The LangGraph agent uses the Gemini LLM to map natural language to the sheet schema.
-3. **Refinement:** The `thread_id` allows the LLM to remember the current draft across multiple chat messages.
-4. **Persistence:** Data is only sent to Google Sheets once the user is satisfied with the preview.
+1. **Discovery (`backend/app/mcp_tools.py`):** The system dynamically fetches headers from Google Sheets so the AI knows the exact schema.
+2. **Extraction (`backend/app/agent.py`):** The LangGraph agent uses the Gemini LLM to map natural language to the sheet schema.
+3. **Refinement (`frontend/src/App.tsx`):** The `thread_id` allows the LLM to remember the current draft across multiple chat messages.
+4. **Persistence (`backend/app/main.py`):** Data is only sent to Google Sheets once the user is satisfied with the preview.
 
 ## Folder Structure
 - `frontend/`: React (TypeScript/Vite) application containing the UI, chat interface, and data preview components.
