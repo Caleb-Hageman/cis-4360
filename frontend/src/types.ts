@@ -7,3 +7,9 @@ export type Message = {
   content: string;
   preview?: SheetRow;
 };
+
+export type AuthUser = {
+  email?: string;
+  name?: string;
+  picture?: string;
+};

@@ -9,6 +9,7 @@ class UserProfile(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     user_profile: UserProfile
+    spreadsheet_id: Optional[str] = None
     system_override: Optional[str] = None
     thread_id: Optional[str] = "default_thread"
     agent_role: Optional[str] = None

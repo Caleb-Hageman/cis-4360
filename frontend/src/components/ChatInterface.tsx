@@ -9,14 +9,20 @@ interface Props {
 export default function ChatInterface({ messages, onSendMessage }: Props) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
 
-  // Auto-resize textarea as user types
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
   }, [input]);
+
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [messages]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -32,13 +38,26 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
   };
 
   return (
-    <>
-      <div className="message-list">
-        {messages.map((msg, i) => (
-          <div key={i} className={`message-bubble ${msg.role}`}>
-            <p>{msg.content}</p>
+    <section className="chat-shell">
+      <div className="message-list" ref={messageListRef}>
+        {messages.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state__badge">AI assistant</div>
+            <h2>Track solved problems in a chat-first workspace.</h2>
+            <p>
+              Describe what you solved, the approach, and anything worth logging.
+              I&apos;ll turn it into a clean Google Sheets entry.
+            </p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg, i) => (
+            <div key={i} className={`message-row ${msg.role}`}>
+              <div className={`message-bubble ${msg.role}`}>
+                <p>{msg.content}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="input-container">
@@ -52,20 +71,28 @@ export default function ChatInterface({ messages, onSendMessage }: Props) {
             placeholder="I solved 'Two Sum' today..."
           />
           <button
+            type="button"
             className="send-arrow-btn"
             onClick={handleSend}
             disabled={!input.trim()}
             aria-label="Send"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke={input.trim() ? '#131314' : '#9aa0a6'}
-              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
             </svg>
           </button>
         </div>
       </div>
-    </>
+    </section>
   );
 }
