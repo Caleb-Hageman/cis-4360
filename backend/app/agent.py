@@ -10,6 +10,8 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from prompt_template import DataExtractionTemplate
 
+from google.genai import types
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 CHECKPOINT_DB_PATH = os.getenv(
     "LANGGRAPH_CHECKPOINT_DB",
@@ -24,7 +26,6 @@ class AgentState(TypedDict, total=False):
     summary_report: dict[str, Any]
     reply: str
     user_profile: dict[str, Any]
-    system_prompt: str
     agent_role: str
     decomp_instructions: list[str]
     scaff_instructions: list[str]
@@ -52,15 +53,14 @@ def format_profile_context(user_profile: dict[str, Any]) -> str:
     return "\n".join(profile_lines)
 
 
-def format_history_context(history: list[dict[str, str]]) -> str:
-    if not history:
-        return "No prior conversation."
-
-    recent_messages = history[-6:]
-    return "\n".join(
-        f"{message.get('role', 'unknown').title()}: {message.get('content', '')}"
-        for message in recent_messages
-    )
+def prepare_history_contents(history: list[dict[str, str]]) -> list[types.Content]:
+    """Convert history into Gemini-compatible Content objects."""
+    contents = []
+    # Send up to 10 recent messages for history
+    for msg in history[-10:]:
+        role = "model" if msg.get("role") == "assistant" else "user"
+        contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))]))
+    return contents
 
 
 def normalize_row(
@@ -115,8 +115,8 @@ def extraction_node(state: AgentState):
     prior_history = list(state.get("conversation_history", []))
     today = datetime.now().strftime("%Y-%m-%d")
 
-    template = (
-        DataExtractionTemplate("Extract or update LeetCode spreadsheet data from: {user_msg}")
+    system_template = (
+        DataExtractionTemplate("Task: Extract or update LeetCode spreadsheet data based on the user's latest input.")
         .with_role(role)
         .with_chain_of_thought()
         .with_context(
@@ -124,7 +124,6 @@ def extraction_node(state: AgentState):
                 [
                     f"The spreadsheet has these columns: {', '.join(headers)}",
                     f"User profile:\n{format_profile_context(user_profile)}",
-                    f"Prior conversation:\n{format_history_context(prior_history)}",
                     (
                         "Existing draft row:\n"
                         f"{json.dumps(previous_row, ensure_ascii=True).replace('{', '{{').replace('}', '}}') if previous_row else 'No existing draft yet.'}"
@@ -158,13 +157,17 @@ def extraction_node(state: AgentState):
         )
     )
 
-    formatted_instruction = template.full_prompt(user_msg=user_msg, today=today)
-    if state.get("system_prompt"):
-        formatted_instruction = f"{state['system_prompt']}\n\n{formatted_instruction}"
+    system_instruction = system_template.full_prompt(today=today)
+    
+    contents = prepare_history_contents(prior_history)
+    contents.append(types.Content(role="user", parts=[types.Part(text=user_msg)]))
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=formatted_instruction,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+        ),
+        contents=contents,
     )
 
     reply = (

@@ -161,7 +161,6 @@ async def chat_endpoint(req: ChatRequest, request: Request):
 
     inputs = {
         "user_message": req.message,
-        "system_prompt": req.system_override or "Default prompt",
         "headers": headers,
         "user_profile": req.user_profile.model_dump(),
         "agent_role": req.agent_role,
