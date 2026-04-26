@@ -13,8 +13,15 @@ dist/
 
 # Secrets & Environment
 .env
-*.json (unless it's a config file—careful with Google Service Account keys!)
+# Ignore all JSON files to prevent leaking service account keys
+*.json
 credentials/
+# If you have specific JSON configs that NEED to be tracked, include them explicitly with !
+# !config.json
+
+# Large files
+cis-4360_project.zip
+Hageman_FinalPresentation.mp4
 
 # OS specific
 .DS_Store
